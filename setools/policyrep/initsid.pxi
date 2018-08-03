@@ -40,6 +40,7 @@ cdef class InitialSID(Ocontext):
     """An initial SID statement."""
 
     cdef str name
+    cdef str context_str
 
     @staticmethod
     cdef factory(SELinuxPolicy policy, sepol.ocontext *symbol):
@@ -57,11 +58,15 @@ cdef class InitialSID(Ocontext):
         else:
             raise NotImplementedError
 
+        i.context_str = str(Context.factory(policy, symbol.context))
+
         return i
 
     def __str__(self):
         return self.name
 
+    def statement(self):
+        return "sid " + self.name + " " + self.context_str
 
 cdef class InitialSIDIterator(OcontextIterator):
 
