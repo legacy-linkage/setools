@@ -53,7 +53,7 @@ class SELinuxPolicy(setools.SELinuxPolicy):
 
         # initial security identifiers
         stmt += comment("Define the initial security identifiers")
-        for sid_ in cond_sort(self.initialsids()):
+        for sid_ in self.initialsids():
             stmt += "sid {0}\n".format(sid_)
         stmt += "\n"
 
@@ -167,7 +167,7 @@ class SELinuxPolicy(setools.SELinuxPolicy):
 
         # define signature id
         stmt += comment("Define the initial sid contexts")
-        for sid_ in cond_sort(self.initialsids()):
+        for sid_ in self.initialsids():
             stmt += "{0}\n".format(sid_.statement())
         stmt += "\n"
 

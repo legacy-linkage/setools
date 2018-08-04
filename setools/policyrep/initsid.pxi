@@ -27,10 +27,12 @@ SELINUX_SIDNAMES = ("undefined", "kernel", "security", "unlabeled", "fs", "file"
     "tcp_socket", "sysctl_modprobe", "sysctl", "sysctl_fs", "sysctl_kernel", "sysctl_net",
     "sysctl_net_unix", "sysctl_vm", "sysctl_dev", "kmod", "policy", "scmp_packet", "devnull")
 
+SELINUX_SIDNAMES_DICT = dict((v, k) for k, v in enumerate(SELINUX_SIDNAMES))
 
 XEN_SIDNAMES = ("xen", "dom0", "domxen", "domio", "unlabeled", "security", "irq", "iomem", "ioport",
     "device", "domU", "domDM")
 
+XEN_SIDNAMES_DICT = dict((v, k) for k, v in enumerate(XEN_SIDNAMES))
 
 #
 # Classes
@@ -40,7 +42,6 @@ cdef class InitialSID(Ocontext):
     """An initial SID statement."""
 
     cdef str name
-    cdef str context_str
 
     @staticmethod
     cdef factory(SELinuxPolicy policy, sepol.ocontext *symbol):
@@ -58,24 +59,21 @@ cdef class InitialSID(Ocontext):
         else:
             raise NotImplementedError
 
-        i.context_str = str(Context.factory(policy, symbol.context))
-
         return i
 
     def __str__(self):
         return self.name
 
     def statement(self):
-        return "sid " + self.name + " " + self.context_str
+        return "sid " + self.name + " " + str(Context.factory(self.policy, self.handle.context))
 
-cdef class InitialSIDIterator(OcontextIterator):
-
+cdef class RawSIDIterator(OcontextIterator):
     """Iterator for initial SID statements in the policy."""
 
     @staticmethod
     cdef factory(SELinuxPolicy policy, sepol.ocontext_t *head):
         """Factory function for creating initial SID iterators."""
-        i = InitialSIDIterator()
+        i = RawSIDIterator()
         i.policy = policy
         i.head = i.curr = head
         return i
@@ -83,3 +81,39 @@ cdef class InitialSIDIterator(OcontextIterator):
     def __next__(self):
         super().__next__()
         return InitialSID.factory(self.policy, self.ocon)
+
+cdef class InitialSIDIterator:
+
+    """Iterator for initial SID statements in the policy."""
+
+    cdef:
+        list items
+
+    @staticmethod
+    cdef factory(SELinuxPolicy policy, sepol.ocontext_t *head):
+        """Factory function for creating initial SID iterators."""
+
+        def sort_selinux_sid(item):
+            name = str(item)
+            return SELINUX_SIDNAMES_DICT[name] if name in SELINUX_SIDNAMES_DICT else len(SELINUX_SIDNAMES)
+
+        def sort_xen_sid(item):
+            name = str(item)
+            return XEN_SIDNAMES_DICT[name] if name in XEN_SIDNAMES_DICT else len(XEN_SIDNAMES)
+        
+        raw_it = RawSIDIterator.factory(policy, head)
+        i = InitialSIDIterator()
+        if policy.target_platform == PolicyTarget.selinux:
+            i.items = sorted(raw_it, key=sort_selinux_sid)
+        elif policy.target_platform == PolicyTarget.xen:
+            i.items = sorted(raw_it, key=sort_xen_sid)
+        else:
+            i.items = list(raw_it)
+
+        return i
+
+    def __iter__(self):
+        return iter(self.items)
+
+    def __len__(self):
+        return len(self.items)
