@@ -67,53 +67,39 @@ cdef class InitialSID(Ocontext):
     def statement(self):
         return "sid " + self.name + " " + str(Context.factory(self.policy, self.handle.context))
 
-cdef class RawSIDIterator(OcontextIterator):
+cdef class InitialSIDIterator(OcontextIterator):
     """Iterator for initial SID statements in the policy."""
 
     @staticmethod
     cdef factory(SELinuxPolicy policy, sepol.ocontext_t *head):
         """Factory function for creating initial SID iterators."""
-        i = RawSIDIterator()
+        i = InitialSIDIterator()
         i.policy = policy
         i.head = i.curr = head
         return i
+    
+    @staticmethod
+    def sorted_by_symbol_order(sid_iter):
+        def selinux_sid_sort_key(item):
+            name = str(item)
+            return SELINUX_SIDNAMES_DICT[name] if name in SELINUX_SIDNAMES_DICT else len(SELINUX_SIDNAMES)
+
+        def xen_sid_sort_key(item):
+            name = str(item)
+            return XEN_SIDNAMES_DICT[name] if name in XEN_SIDNAMES_DICT else len(XEN_SIDNAMES)
+
+        it = iter(sid_iter)
+        if sid_iter.target_platform == PolicyTarget.selinux:
+            return sorted(it, key=selinux_sid_sort_key)
+        elif sid_iter.target_platform == PolicyTarget.xen:
+            return sorted(it, key=xen_sid_sort_key)
+        else:
+            return list(it)
+    
+    @property
+    def target_platform(self):
+        return self.policy.target_platform
 
     def __next__(self):
         super().__next__()
         return InitialSID.factory(self.policy, self.ocon)
-
-cdef class InitialSIDIterator:
-
-    """Iterator for initial SID statements in the policy."""
-
-    cdef:
-        list items
-
-    @staticmethod
-    cdef factory(SELinuxPolicy policy, sepol.ocontext_t *head):
-        """Factory function for creating initial SID iterators."""
-
-        def sort_selinux_sid(item):
-            name = str(item)
-            return SELINUX_SIDNAMES_DICT[name] if name in SELINUX_SIDNAMES_DICT else len(SELINUX_SIDNAMES)
-
-        def sort_xen_sid(item):
-            name = str(item)
-            return XEN_SIDNAMES_DICT[name] if name in XEN_SIDNAMES_DICT else len(XEN_SIDNAMES)
-        
-        raw_it = RawSIDIterator.factory(policy, head)
-        i = InitialSIDIterator()
-        if policy.target_platform == PolicyTarget.selinux:
-            i.items = sorted(raw_it, key=sort_selinux_sid)
-        elif policy.target_platform == PolicyTarget.xen:
-            i.items = sorted(raw_it, key=sort_xen_sid)
-        else:
-            i.items = list(raw_it)
-
-        return i
-
-    def __iter__(self):
-        return iter(self.items)
-
-    def __len__(self):
-        return len(self.items)
