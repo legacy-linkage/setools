@@ -147,6 +147,12 @@ class SELinuxPolicy(setools.SELinuxPolicy):
                 stmt += "{0}\n".format(rule_)
         stmt += "\n"
 
+        # define permissives
+        stmt += comment("Define permissives")
+        for permissive_type_ in cond_sort(type_ for type_ in self.types() if type_.ispermissive):
+            stmt += "permissive {0};\n".format(permissive_type_)
+        stmt += "\n"
+
         # define roles
         stmt += comment("Define roles identifiers")
         for role_ in cond_sort(self.roles()):
